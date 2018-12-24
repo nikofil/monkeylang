@@ -154,6 +154,18 @@ impl Lexer {
     }
 }
 
+impl Iterator for Lexer {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+        let tok = self.next_token();
+        match tok {
+            Token::Eof | Token::Illegal => None,
+            _ => Some(tok),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{ Lexer, Token };
@@ -202,13 +214,8 @@ mod test {
                            10 == 10;
                            10 != 9;";
         let mut lex = Lexer::new(String::from(input));
-        let mut tokens = Vec::new();
         lex.read_char();
-        let mut tok = lex.next_token();
-        while tok != Token::Eof {
-            tokens.push(tok.clone());
-            tok = lex.next_token();
-        }
+        let mut tokens = lex.collect::<Vec<Token>>();
         assert_eq!(tokens.len(), 73);
         assert!(!tokens.iter().any(|t| *t == Token::Illegal));
     }
