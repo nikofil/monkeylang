@@ -52,6 +52,7 @@ impl Lexer {
         }) {
             self.read_char();
         }
+        let mut read_next = true;
         let ret = self.ch.map_or(Token::Eof, |c| {
             match c {
                 '=' => Token::Assign,
@@ -65,17 +66,23 @@ impl Lexer {
                 c => {
                     if c.is_alphabetic() || c == '_' {
                         let ident = self.read_ident();
+                        read_next = false;
                         match keywords.get(ident.as_str()) {
                             None => Token::Ident(ident),
                             Some(c) => c.clone(),
                         }
+                    } else if c.is_numeric() {
+                        read_next = false;
+                        Token::Int(self.read_num())
                     } else {
                         Token::Illegal
                     }
                 },
             }
         });
-        self.read_char();
+        if read_next {
+            self.read_char();
+        }
         ret
     }
 
@@ -86,9 +93,21 @@ impl Lexer {
                 break;
             }
             ident.push(c);
-            self.read_char()
+            self.read_char();
         }
         ident
+    }
+
+    fn read_num(&mut self) -> i32 {
+        let mut num_s = String::new();
+        while let Some(c) = self.ch {
+            if !(c.is_numeric()) {
+                break;
+            }
+            num_s.push(c);
+            self.read_char();
+        }
+        num_s.parse::<i32>().unwrap()
     }
 }
 
@@ -108,9 +127,10 @@ mod test {
 
     #[test]
     fn test_lexer() {
-        let mut lex = Lexer::new(String::from("let a + b = ;"));
+        let mut lex = Lexer::new(String::from("let a+b = 32;"));
         let expected = vec![Token::Let, Token::Ident(String::from("a")),
-            Token::Plus, Token::Ident(String::from("b")), Token::Assign, Token::Semicolon];
+            Token::Plus, Token::Ident(String::from("b")), Token::Assign,
+            Token::Int(32), Token::Semicolon];
         let mut tokens = Vec::new();
         lex.read_char();
         let mut tok = lex.next_token();
