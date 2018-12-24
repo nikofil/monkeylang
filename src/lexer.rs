@@ -16,6 +16,19 @@ pub enum Token {
     Rbrace,
     Function,
     Let,
+    Eq,
+    Not,
+    Ne,
+    Minus,
+    Div,
+    Mul,
+    Lt,
+    Gt,
+    True,
+    False,
+    If,
+    Else,
+    Ret,
 }
 
 pub struct Lexer {
@@ -23,11 +36,20 @@ pub struct Lexer {
     pos: usize,
     read_pos: usize,
     ch: Option<char>,
+    keywords: HashMap<&'static str, Token>,
 }
 
 impl Lexer {
     pub fn new(input: String) -> Lexer {
-        Lexer{ input: input.chars().collect::<Vec<char>>(), pos: 0, read_pos: 0, ch: None }
+        let mut keywords = HashMap::new();
+        keywords.insert("let", Token::Let);
+        keywords.insert("fn", Token::Function);
+        keywords.insert("true", Token::True);
+        keywords.insert("false", Token::False);
+        keywords.insert("if", Token::If);
+        keywords.insert("else", Token::Else);
+        keywords.insert("return", Token::Ret);
+        Lexer{ input: input.chars().collect::<Vec<char>>(), pos: 0, read_pos: 0, ch: None, keywords }
     }
 
     pub fn read_char(&mut self) {
@@ -43,10 +65,11 @@ impl Lexer {
         self.ch
     }
 
+    pub fn peek_char(&self) -> Option<char> {
+        self.input.get(self.read_pos).map(|c| *c)
+    }
+
     pub fn next_token(&mut self) -> Token {
-        let mut keywords = HashMap::new();
-        keywords.insert("let", Token::Let);
-        keywords.insert("fn", Token::Function);
         while self.ch.map_or(false, |c| {
             c.is_whitespace()
         }) {
@@ -55,7 +78,14 @@ impl Lexer {
         let mut read_next = true;
         let ret = self.ch.map_or(Token::Eof, |c| {
             match c {
-                '=' => Token::Assign,
+                '=' => {
+                    if let Some('=') = self.peek_char() {
+                        self.read_char();
+                        Token::Eq
+                    } else {
+                        Token::Assign
+                    }
+                },
                 '+' => Token::Plus,
                 ',' => Token::Comma,
                 ';' => Token::Semicolon,
@@ -63,11 +93,24 @@ impl Lexer {
                 ')' => Token::Rparen,
                 '{' => Token::Lbrace,
                 '}' => Token::Rbrace,
+                '!' => {
+                    if let Some('=') = self.peek_char() {
+                        self.read_char();
+                        Token::Ne
+                    } else {
+                        Token::Not
+                    }
+                },
+                '-' => Token::Minus,
+                '/' => Token::Div,
+                '*' => Token::Mul,
+                '<' => Token::Lt,
+                '>' => Token::Gt,
                 c => {
                     if c.is_alphabetic() || c == '_' {
                         let ident = self.read_ident();
                         read_next = false;
-                        match keywords.get(ident.as_str()) {
+                        match self.keywords.get(ident.as_str()) {
                             None => Token::Ident(ident),
                             Some(c) => c.clone(),
                         }
@@ -139,5 +182,34 @@ mod test {
             tok = lex.next_token();
         }
         assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_lexer_2() {
+        let input = "let five = 5;
+                           let ten = 10;
+                           let add = fn(x, y) {
+                           x + y;
+                           };
+                           let result = add(five, ten);
+                           !-/*5;
+                           5 < 10 > 5;
+                           if (5 < 10) {
+                           return true;
+                           } else {
+                           return false;
+                           }
+                           10 == 10;
+                           10 != 9;";
+        let mut lex = Lexer::new(String::from(input));
+        let mut tokens = Vec::new();
+        lex.read_char();
+        let mut tok = lex.next_token();
+        while tok != Token::Eof {
+            tokens.push(tok.clone());
+            tok = lex.next_token();
+        }
+        assert_eq!(tokens.len(), 73);
+        assert!(!tokens.iter().any(|t| *t == Token::Illegal));
     }
 }
