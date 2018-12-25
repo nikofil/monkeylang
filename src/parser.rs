@@ -16,6 +16,20 @@ impl<'a> Parser<'a> {
         Parser{ lexer, cur_tok, next_tok }
     }
 
+    pub fn assert_ident(&mut self) -> String {
+        match self.next_token().clone() {
+            Token::Ident(s) => s,
+            _ => panic!("Expected Ident, got {:?}", self.cur_tok),
+        }
+    }
+
+    pub fn assert_int(&mut self) -> i32 {
+        match self.next_token().clone() {
+            Token::Int(i) => i,
+            _ => panic!("Expected Int, got {:?}", self.cur_tok),
+        }
+    }
+
     pub fn next_token(&mut self) -> &Token {
         self.cur_tok = mem::replace(&mut self.next_tok, self.lexer.next_token());
         &self.cur_tok
@@ -31,7 +45,6 @@ impl<'a> Parser<'a> {
             }
             self.next_token();
         }
-        println!("prog {:?}", prog);
         prog
     }
 
@@ -43,19 +56,11 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_let(&mut self) -> Statement {
-        let next_tok = self.next_token().clone();
-        if let Token::Ident(ident) = next_tok {
-            let rv = match self.next_token() {
-                Token::Assign => {
-                    Statement::Let(ident.clone(), self.parse_expression())
-                },
-                _ => panic!("Assign not found"),
-            };
-            assert_eq!(self.next_token(), &Token::Semicolon);
-            rv
-        } else {
-            panic!("Identifier not found");
-        }
+        let ident = self.assert_ident();
+        assert_eq!(self.next_token(), &Token::Assign);
+        let rv = Statement::Let(ident.clone(), self.parse_expression());
+        assert_eq!(self.next_token(), &Token::Semicolon);
+        rv
     }
 
     pub fn parse_expression(&mut self) -> Expression {
@@ -72,8 +77,11 @@ mod test {
 
     #[test]
     fn test_let() {
-        let mut lexer = Lexer::new(String::from("let x = 10;"));
+        let mut lexer = Lexer::new(String::from("let x = 10;let y=11;"));
         let mut parser = Parser::new(&mut lexer);
-        parser.parse_program();
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::Let(String::from("x"), Expression::Int(10))),
+            Box::new(Statement::Let(String::from("y"), Expression::Int(11)))
+        ]);
     }
 }

@@ -1,11 +1,9 @@
-use lexer::Token;
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expression {
     Int(i32),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     Let(String, Expression),
 }
@@ -21,5 +19,9 @@ impl Program {
     }
     pub fn push(&mut self, statement: Statement) {
         self.statements.push(Box::new(statement));
+    }
+
+    pub fn statements(&self) -> &Vec<Box<Statement>> {
+        &self.statements
     }
 }

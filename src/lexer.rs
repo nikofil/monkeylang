@@ -215,7 +215,7 @@ mod test {
                            10 != 9;";
         let mut lex = Lexer::new(String::from(input));
         lex.read_char();
-        let mut tokens = lex.collect::<Vec<Token>>();
+        let tokens = lex.collect::<Vec<Token>>();
         assert_eq!(tokens.len(), 73);
         assert!(!tokens.iter().any(|t| *t == Token::Illegal));
     }
