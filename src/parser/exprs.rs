@@ -1,30 +1,25 @@
-use super::Parser;
 use ::ast::Expression;
 use ::ast::Expression::*;
 use ::lexer::Token;
-use std::collections::HashMap;
 
-fn prefix_minus(e: Expression) -> Expression {
-    Neg(Box::new(e))
+pub fn prefix_parser(tok: &Token) -> Option<Box<Fn(Expression) -> Expression>> {
+    Some(match tok {
+        &Token::Not => Box::new(|exp| Not(Box::new(exp))),
+        &Token::Minus => Box::new(|exp| Neg(Box::new(exp))),
+        _ => return None
+    })
 }
 
-fn prefix_not(e: Expression) -> Expression {
-    Not(Box::new(e))
-}
-
-fn infix_plus(e1: Expression, e2: Expression) -> Expression {
-    Plus(Box::new(e1), Box::new(e2))
-}
-
-pub fn get_prefix_fns() -> HashMap<Token, fn(Expression) -> Expression> {
-    let mut rv: HashMap<Token, fn(Expression) -> Expression> = HashMap::new();
-    rv.insert(Token::Minus, prefix_minus);
-    rv.insert(Token::Not, prefix_not);
-    rv
-}
-
-pub fn get_infix_fns() -> HashMap<Token, fn(Expression, Expression) -> Expression> {
-    let mut rv: HashMap<Token, fn(Expression, Expression) -> Expression> = HashMap::new();
-    rv.insert(Token::Plus, infix_plus);
-    rv
+pub fn infix_parser(tok: &Token) -> Option<Box<Fn(Expression, Expression) -> Expression>> {
+    Some(match tok {
+        &Token::Plus => Box::new(|left, right| Plus(Box::new(left), Box::new(right))),
+        &Token::Minus => Box::new(|left, right| Minus(Box::new(left), Box::new(right))),
+        &Token::Div => Box::new(|left, right| Div(Box::new(left), Box::new(right))),
+        &Token::Mul => Box::new(|left, right| Mul(Box::new(left), Box::new(right))),
+        &Token::Eq => Box::new(|left, right| Eq(Box::new(left), Box::new(right))),
+        &Token::Ne => Box::new(|left, right| Ne(Box::new(left), Box::new(right))),
+        &Token::Lt => Box::new(|left, right| Lt(Box::new(left), Box::new(right))),
+        &Token::Gt => Box::new(|left, right| Gt(Box::new(left), Box::new(right))),
+        _ => return None
+    })
 }

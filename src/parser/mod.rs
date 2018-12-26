@@ -5,7 +5,7 @@ use ast::*;
 use std::mem;
 use std::collections::HashMap;
 
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Debug)]
 enum OpPrecedence {
     Lowest,
     Eq,
@@ -23,8 +23,18 @@ pub struct Parser<'a> {
 }
 
 lazy_static! {
-    static ref PREFIX_FNS: HashMap<Token, fn(Expression) -> Expression> = exprs::get_prefix_fns();
-    static ref INFIX_FNS: HashMap<Token, fn(Expression, Expression) -> Expression> = exprs::get_infix_fns();
+    static ref OP_PRECEDENCE: HashMap<Token, OpPrecedence> = {
+        let mut opp = HashMap::new();
+        opp.insert(Token::Eq, OpPrecedence::Eq);
+        opp.insert(Token::Ne, OpPrecedence::Eq);
+        opp.insert(Token::Lt, OpPrecedence::LtGt);
+        opp.insert(Token::Gt, OpPrecedence::LtGt);
+        opp.insert(Token::Plus, OpPrecedence::Sum);
+        opp.insert(Token::Minus, OpPrecedence::Sum);
+        opp.insert(Token::Mul, OpPrecedence::Prod);
+        opp.insert(Token::Div, OpPrecedence::Prod);
+        opp
+    };
 }
 
 impl<'a> Parser<'a> {
@@ -91,17 +101,38 @@ impl<'a> Parser<'a> {
         rv
     }
 
+    fn cur_precedence(&self) -> OpPrecedence {
+        OP_PRECEDENCE.get(&self.cur_tok).unwrap_or(&OpPrecedence::Lowest).clone()
+    }
+
+    fn peek_precedence(&self) -> OpPrecedence {
+        OP_PRECEDENCE.get(&self.next_tok).unwrap_or(&OpPrecedence::Lowest).clone()
+    }
+
     fn parse_expression(&mut self, op_prec: OpPrecedence) -> Expression {
-        match self.cur_tok.clone() {
+        let mut left = match self.cur_tok.clone() {
             Token::Int(i) => Expression::Int(i),
             Token::Ident(s) => Expression::Ident(s),
-            other => PREFIX_FNS.get(&other).map_or_else(|| {
-                panic!("not found prefix {:?}", &other);
-            },|&prefix_fn| {
+            other => exprs::prefix_parser(&other).map(|prefix_fn| {
                 self.next_token();
                 prefix_fn(self.parse_expression(OpPrecedence::Prefix))
-            })
+            }).unwrap_or_else(|| panic!("Prefix operator not found: {:?}", &other))
+        };
+        println!("left {:?} {:?}", &left, &op_prec);
+
+        while &self.next_tok != &Token::Semicolon && op_prec < self.peek_precedence() {
+            let infix = match exprs::infix_parser(&self.next_tok) {
+                None => break,
+                Some(i) => i,
+            };
+            self.next_token();
+            let prec = self.cur_precedence();
+            self.next_token();
+            println!("next {:?}", &self.cur_tok);
+            left = infix(left, self.parse_expression(prec));
         }
+        println!("ret {:?}", &left);
+        left
     }
 
     fn parse_expression_stmt(&mut self) -> Statement {
@@ -153,7 +184,7 @@ mod test {
 
     #[test]
     fn test_infix_stmts() {
-        let mut lexer = Lexer::new(String::from("x + 10;y < z;"));
+        let mut lexer = Lexer::new(String::from("x + 10;y < z; 1 + 2 * 3 / 4 - 5 == 0"));
         let mut parser = Parser::new(&mut lexer);
         assert_eq!(parser.parse_program().statements(), &vec![
             Box::new(Statement::ExprStatement(
@@ -163,7 +194,22 @@ mod test {
             Box::new(Statement::ExprStatement(
                 Expression::Lt(
                     Box::new(Expression::Ident(String::from("y"))),
-                    Box::new(Expression::Ident(String::from("z"))))))
+                    Box::new(Expression::Ident(String::from("z")))))),
+            Box::new(Statement::ExprStatement(
+                Expression::Eq(
+                    Box::new(Expression::Minus(
+                        Box::new(Expression::Plus(
+                            Box::new(Expression::Int(1)),
+                            Box::new(Expression::Div(
+                                Box::new(Expression::Mul(
+                                    Box::new(Expression::Int(2)),
+                                    Box::new(Expression::Int(3))
+                                )),
+                                Box::new(Expression::Int(4)))),
+                        )),
+                        Box::new(Expression::Int(5))
+                    )),
+                    Box::new(Expression::Int(0)))))
         ]);
     }
 }

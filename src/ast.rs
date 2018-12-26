@@ -2,7 +2,13 @@
 pub enum Expression {
     Int(i32),
     Plus(Box<Expression>, Box<Expression>),
+    Minus(Box<Expression>, Box<Expression>),
+    Div(Box<Expression>, Box<Expression>),
+    Mul(Box<Expression>, Box<Expression>),
+    Eq(Box<Expression>, Box<Expression>),
+    Ne(Box<Expression>, Box<Expression>),
     Lt(Box<Expression>, Box<Expression>),
+    Gt(Box<Expression>, Box<Expression>),
     Ident(String),
     Neg(Box<Expression>),
     Not(Box<Expression>),
