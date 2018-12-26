@@ -2,6 +2,17 @@ use lexer::{ Lexer, Token };
 use ast::*;
 use std::mem;
 
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+enum OpPrecedence {
+    Lowest,
+    Eq,
+    LtGt,
+    Sum,
+    Prod,
+    Prefix,
+    Call,
+}
+
 pub struct Parser<'a> {
     lexer: &'a mut Lexer,
     cur_tok: Token,
@@ -16,21 +27,21 @@ impl<'a> Parser<'a> {
         Parser{ lexer, cur_tok, next_tok }
     }
 
-    pub fn assert_ident(&mut self) -> String {
+    fn assert_ident(&mut self) -> String {
         match self.next_token().clone() {
             Token::Ident(s) => s,
             _ => panic!("Expected Ident, got {:?}", self.cur_tok),
         }
     }
 
-    pub fn assert_int(&mut self) -> i32 {
+    fn assert_int(&mut self) -> i32 {
         match self.next_token().clone() {
             Token::Int(i) => i,
             _ => panic!("Expected Int, got {:?}", self.cur_tok),
         }
     }
 
-    pub fn next_token(&mut self) -> &Token {
+    fn next_token(&mut self) -> &Token {
         self.cur_tok = mem::replace(&mut self.next_tok, self.lexer.next_token());
         &self.cur_tok
     }
@@ -48,26 +59,41 @@ impl<'a> Parser<'a> {
         prog
     }
 
-    pub fn parse_statement(&mut self) -> Statement {
+    fn parse_statement(&mut self) -> Statement {
         match self.cur_tok {
             Token::Let => self.parse_let(),
-            _ => panic!("{:?}", self.cur_tok),
+            Token::Ret => self.parse_ret(),
+            _ => self.parse_expression_stmt(),
         }
     }
 
-    pub fn parse_let(&mut self) -> Statement {
+    fn parse_let(&mut self) -> Statement {
         let ident = self.assert_ident();
         assert_eq!(self.next_token(), &Token::Assign);
-        let rv = Statement::Let(ident.clone(), self.parse_expression());
+        let rv = Statement::Let(ident.clone(), self.parse_expression(OpPrecedence::Lowest));
         assert_eq!(self.next_token(), &Token::Semicolon);
         rv
     }
 
-    pub fn parse_expression(&mut self) -> Expression {
+    fn parse_ret(&mut self) -> Statement {
+        let rv = Statement::Ret(self.parse_expression(OpPrecedence::Lowest));
+        assert_eq!(self.next_token(), &Token::Semicolon);
+        rv
+    }
+
+    fn parse_expression(&mut self, op_prec: OpPrecedence) -> Expression {
         match self.next_token() {
             Token::Int(i) => Expression::Int(*i),
             other => panic!("Invalid expression: {:?}", other)
         }
+    }
+
+    fn parse_expression_stmt(&mut self) -> Statement {
+        let rv = Statement::ExprStatement(self.parse_expression(OpPrecedence::Lowest));
+        if self.next_tok == Token::Semicolon {
+            self.next_token();
+        }
+        rv
     }
 }
 

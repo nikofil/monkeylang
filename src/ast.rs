@@ -6,6 +6,8 @@ pub enum Expression {
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     Let(String, Expression),
+    Ret(Expression),
+    ExprStatement(Expression),
 }
 
 #[derive(Debug)]
