@@ -1,6 +1,9 @@
+mod exprs;
+
 use lexer::{ Lexer, Token };
 use ast::*;
 use std::mem;
+use std::collections::HashMap;
 
 #[derive(PartialEq, PartialOrd, Eq, Ord)]
 enum OpPrecedence {
@@ -17,6 +20,11 @@ pub struct Parser<'a> {
     lexer: &'a mut Lexer,
     cur_tok: Token,
     next_tok: Token,
+}
+
+lazy_static! {
+    static ref PREFIX_FNS: HashMap<Token, fn(Expression) -> Expression> = exprs::get_prefix_fns();
+    static ref INFIX_FNS: HashMap<Token, fn(Expression, Expression) -> Expression> = exprs::get_infix_fns();
 }
 
 impl<'a> Parser<'a> {
@@ -70,21 +78,29 @@ impl<'a> Parser<'a> {
     fn parse_let(&mut self) -> Statement {
         let ident = self.assert_ident();
         assert_eq!(self.next_token(), &Token::Assign);
+        self.next_token();
         let rv = Statement::Let(ident.clone(), self.parse_expression(OpPrecedence::Lowest));
         assert_eq!(self.next_token(), &Token::Semicolon);
         rv
     }
 
     fn parse_ret(&mut self) -> Statement {
+        self.next_token();
         let rv = Statement::Ret(self.parse_expression(OpPrecedence::Lowest));
         assert_eq!(self.next_token(), &Token::Semicolon);
         rv
     }
 
     fn parse_expression(&mut self, op_prec: OpPrecedence) -> Expression {
-        match self.next_token() {
-            Token::Int(i) => Expression::Int(*i),
-            other => panic!("Invalid expression: {:?}", other)
+        match self.cur_tok.clone() {
+            Token::Int(i) => Expression::Int(i),
+            Token::Ident(s) => Expression::Ident(s),
+            other => PREFIX_FNS.get(&other).map_or_else(|| {
+                panic!("not found prefix {:?}", &other);
+            },|&prefix_fn| {
+                self.next_token();
+                prefix_fn(self.parse_expression(OpPrecedence::Prefix))
+            })
         }
     }
 
@@ -108,6 +124,46 @@ mod test {
         assert_eq!(parser.parse_program().statements(), &vec![
             Box::new(Statement::Let(String::from("x"), Expression::Int(10))),
             Box::new(Statement::Let(String::from("y"), Expression::Int(11)))
+        ]);
+    }
+
+    #[test]
+    fn test_ret() {
+        let mut lexer = Lexer::new(String::from("return x; return 1;"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::Ret(Expression::Ident(String::from("x")))),
+            Box::new(Statement::Ret(Expression::Int(1)))
+        ]);
+    }
+
+    #[test]
+    fn test_prefix_stmts() {
+        let mut lexer = Lexer::new(String::from("x; 10 ; -1;"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(
+                Expression::Ident(String::from("x")))),
+            Box::new(Statement::ExprStatement(
+                Expression::Int(10))),
+            Box::new(Statement::ExprStatement(
+                Expression::Neg(Box::new(Expression::Int(1)))))
+        ]);
+    }
+
+    #[test]
+    fn test_infix_stmts() {
+        let mut lexer = Lexer::new(String::from("x + 10;y < z;"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(
+                Expression::Plus(
+                    Box::new(Expression::Ident(String::from("x"))),
+                    Box::new(Expression::Int(10))))),
+            Box::new(Statement::ExprStatement(
+                Expression::Lt(
+                    Box::new(Expression::Ident(String::from("y"))),
+                    Box::new(Expression::Ident(String::from("z"))))))
         ]);
     }
 }

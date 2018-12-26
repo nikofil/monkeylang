@@ -1,6 +1,11 @@
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     Int(i32),
+    Plus(Box<Expression>, Box<Expression>),
+    Lt(Box<Expression>, Box<Expression>),
+    Ident(String),
+    Neg(Box<Expression>),
+    Not(Box<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
