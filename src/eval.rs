@@ -11,17 +11,28 @@ pub enum Value {
     Int(i32),
     Bool(bool),
     FnDecl(Vec<String>, Box<Statement>),
+    RetVal(Box<Value>),
     Null,
 }
 
 use eval::Value::*;
+
+impl Value {
+    fn unret(self) -> Value {
+        match self {
+            RetVal(v) => *v,
+            other => other,
+        }
+    }
+}
 
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             Int(i) => f.write_str(&format!("{}", i)),
             Bool(b) => f.write_str(&format!("{}", b)),
-            FnDecl(pars, stmt) => f.write_str(&format!("fn({})", pars.join(", "))),
+            FnDecl(pars, _stmt) => f.write_str(&format!("fn({})", pars.join(", "))),
+            RetVal(v) => v.fmt(f),
             Null => f.write_str("null"),
         }
     }
@@ -71,19 +82,23 @@ impl Eval for Statement {
     fn eval(&self, state: &mut State) -> Option<Value> {
         match self {
             Let(s, exp) => {
-                let val = exp.eval(state).unwrap().clone();
+                let val = exp.eval(state).unwrap().unret();
                 state.set(&s, val);
                 None
             },
-            Ret(exp) => exp.eval(state),
+            Ret(exp) => exp.eval(state).map(|v| RetVal(Box::new(v.unret()))),
             BlockStatement(stmts) => {
-                let mut rv = None;
+                let mut val = None;
                 for st in stmts {
-                    rv = st.eval(state);
+                    val = st.eval(state);
+                    println!("exec {:?} = {:?}", st, val);
+                    if let Some(RetVal(_)) = val {
+                        break;
+                    }
                 }
-                rv
+                val
             },
-            ExprStatement(exp) => exp.eval(state),
+            ExprStatement(exp) => exp.eval(state).map(|v| v),
         }
     }
 }
@@ -134,12 +149,11 @@ impl Eval for Expression {
                     for i in 0..std::cmp::min(actual.len(), formal.len()) {
                         fn_state.set(&formal[i], actual[i].eval(state).unwrap_or(Null));
                     }
-                    stmt.eval(&mut fn_state).unwrap_or(Null)
+                    stmt.eval(&mut fn_state).unwrap_or(Null).unret()
                 } else {
                     Null
                 }
             },
-            _ => unimplemented!()
         })
     }
 }
@@ -157,5 +171,25 @@ mod test {
     fn test_prims() {
         assert_eq!(eval("1").unwrap(), Int(1));
         assert_eq!(eval("true").unwrap(), Bool(true));
+    }
+
+    #[test]
+    fn test_call() {
+        assert_eq!(eval("let abs = fn (x) { if (x > 0) { return x; } return -x; }; abs(1) + abs(-1);").unwrap(), Int(2));
+    }
+
+    #[test]
+    fn test_recursive() {
+        assert_eq!(eval("let fib = fn (x) { if (x < 2) { return x; } else { fib(x-1) + fib(x-2); } }; fib(10);").unwrap(), Int(55));
+    }
+
+    #[test]
+    fn test_stack() {
+        assert_eq!(eval("let x = 10; let f = fn (x) { let x = 2*x+1; x }; let y = f(x); y + x;").unwrap(), Int(31));
+    }
+
+    #[test]
+    fn test_higher_order() {
+        assert_eq!(eval("let twice = fn (f, x) f(f(x)); twice(fn(x) x*2, 10)").unwrap(), Int(40));
     }
 }
