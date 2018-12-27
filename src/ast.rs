@@ -12,6 +12,8 @@ pub enum Expression {
     Ident(String),
     Neg(Box<Expression>),
     Not(Box<Expression>),
+    True,
+    False,
 }
 
 #[derive(Debug, PartialEq)]

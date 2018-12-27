@@ -113,6 +113,14 @@ impl<'a> Parser<'a> {
         let mut left = match self.cur_tok.clone() {
             Token::Int(i) => Expression::Int(i),
             Token::Ident(s) => Expression::Ident(s),
+            Token::True => Expression::True,
+            Token::False => Expression::False,
+            Token::Lparen => {
+                self.next_token();
+                let exp = self.parse_expression(OpPrecedence::Lowest);
+                assert_eq!(self.next_token(), &Token::Rparen);
+                exp
+            },
             other => exprs::prefix_parser(&other).map(|prefix_fn| {
                 self.next_token();
                 prefix_fn(self.parse_expression(OpPrecedence::Prefix))
@@ -184,7 +192,7 @@ mod test {
 
     #[test]
     fn test_infix_stmts() {
-        let mut lexer = Lexer::new(String::from("x + 10;y < z; 1 + 2 * 3 / 4 - 5 == 0"));
+        let mut lexer = Lexer::new(String::from("x + 10;y < z; 1 + 2 * 3 / 4 - 5 == 0; -1-2-3"));
         let mut parser = Parser::new(&mut lexer);
         assert_eq!(parser.parse_program().statements(), &vec![
             Box::new(Statement::ExprStatement(
@@ -209,7 +217,34 @@ mod test {
                         )),
                         Box::new(Expression::Int(5))
                     )),
-                    Box::new(Expression::Int(0)))))
+                    Box::new(Expression::Int(0))))),
+            Box::new(Statement::ExprStatement(
+                Expression::Minus(
+                    Box::new(Expression::Minus(
+                        Box::new(Expression::Neg(Box::new(Expression::Int(1)))),
+                        Box::new(Expression::Int(2))
+                    )),
+                    Box::new(Expression::Int(3))
+                )
+            ))
+        ]);
+    }
+
+
+    #[test]
+    fn test_paren() {
+        let mut lexer = Lexer::new(String::from("(x * (y + z)) == true"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(Expression::Eq(Box::new(
+                Expression::Mul(
+                    Box::new(Expression::Ident(String::from("x"))),
+                    Box::new(Expression::Plus(
+                        Box::new(Expression::Ident(String::from("y"))),
+                        Box::new(Expression::Ident(String::from("z"))),
+                    ))
+                )
+            ), Box::new(Expression::True))))
         ]);
     }
 }
