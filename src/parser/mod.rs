@@ -84,14 +84,18 @@ impl<'a> Parser<'a> {
         assert_eq!(self.next_token(), &Token::Assign);
         self.next_token();
         let rv = Statement::Let(ident.clone(), self.parse_expression(OpPrecedence::Lowest));
-        assert_eq!(self.next_token(), &Token::Semicolon);
+        if self.next_tok == Token::Semicolon {
+            self.next_token();
+        }
         rv
     }
 
     fn parse_ret(&mut self) -> Statement {
         self.next_token();
         let rv = Statement::Ret(self.parse_expression(OpPrecedence::Lowest));
-        assert_eq!(self.next_token(), &Token::Semicolon);
+        if self.next_tok == Token::Semicolon {
+            self.next_token();
+        }
         rv
     }
 
@@ -119,10 +123,13 @@ impl<'a> Parser<'a> {
         assert_eq!(self.next_token(), &Token::Lparen);
         while &self.next_tok != &Token::Rparen {
             params.push(self.assert_ident());
+            if &self.next_tok == &Token::Comma {
+                self.next_token();
+            }
         }
         self.next_token();
         self.next_token();
-        Expression::FnExpr(params, self.parse_statement())
+        Expression::FnExpr(params, Box::new(self.parse_statement()))
     }
 
     fn parse_block(&mut self) -> Statement {
@@ -335,6 +342,27 @@ mod test {
                     Box::new(Expression::Int(2)),
                 ))
             )))
+        ]);
+    }
+
+    #[test]
+    fn test_fn_decl() {
+        let mut lexer = Lexer::new(String::from("let x = fn() 1; let y = fn(a,b) { let x = 1; a+b }"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::Let(
+                String::from("x"),
+                Expression::FnExpr(Vec::new(), Box::new(Statement::ExprStatement(Expression::Int(1)))))),
+            Box::new(Statement::Let(
+                String::from("y"),
+                Expression::FnExpr(
+                    vec![String::from("a"), String::from("b")],
+                    Box::new(Statement::BlockStatement(vec![
+                        Statement::Let(String::from("x"), Expression::Int(1)),
+                        Statement::ExprStatement(Expression::Plus(
+                            Box::new(Expression::Ident(String::from("a"))),
+                            Box::new(Expression::Ident(String::from("b"))),
+                    ))]))))),
         ]);
     }
 }

@@ -15,7 +15,7 @@ pub enum Expression {
     True,
     False,
     IfExpr(Box<Expression>, Box<Statement>, Box<Statement>),
-    FnExpr(Vec<String>, Statement),
+    FnExpr(Vec<String>, Box<Statement>),
 }
 
 #[derive(Debug, PartialEq)]
