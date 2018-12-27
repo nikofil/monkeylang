@@ -33,6 +33,7 @@ lazy_static! {
         opp.insert(Token::Minus, OpPrecedence::Sum);
         opp.insert(Token::Mul, OpPrecedence::Prod);
         opp.insert(Token::Div, OpPrecedence::Prod);
+        opp.insert(Token::Lparen, OpPrecedence::Call);
         opp
     };
 }
@@ -115,7 +116,7 @@ impl<'a> Parser<'a> {
                 Statement::BlockStatement(Vec::new())
             }
         };
-        Expression::IfExpr(Box::new(cond), Box::new(if_st), Box::new(else_st))
+        Expression::If(Box::new(cond), Box::new(if_st), Box::new(else_st))
     }
 
     fn parse_fn(&mut self) -> Expression {
@@ -129,7 +130,7 @@ impl<'a> Parser<'a> {
         }
         self.next_token();
         self.next_token();
-        Expression::FnExpr(params, Box::new(self.parse_statement()))
+        Expression::FnDecl(params, Box::new(self.parse_statement()))
     }
 
     fn parse_block(&mut self) -> Statement {
@@ -169,16 +170,34 @@ impl<'a> Parser<'a> {
         };
 
         while &self.next_tok != &Token::Semicolon && op_prec < self.peek_precedence() {
-            let infix = match exprs::infix_parser(&self.next_tok) {
-                None => break,
-                Some(i) => i,
-            };
-            self.next_token();
-            let prec = self.cur_precedence();
-            self.next_token();
-            left = infix(left, self.parse_expression(prec));
+            if self.next_tok != Token::Lparen {
+                let infix = match exprs::infix_parser(&self.next_tok) {
+                    None => break,
+                    Some(i) => i,
+                };
+                self.next_token();
+                let prec = self.cur_precedence();
+                self.next_token();
+                left = infix(left, self.parse_expression(prec));
+            } else {
+                left = self.parse_call(left);
+            }
         }
         left
+    }
+
+    fn parse_call(&mut self, fn_exp: Expression) -> Expression {
+        let mut params = Vec::new();
+        self.next_token();
+        while self.next_tok != Token::Rparen {
+            self.next_token();
+            params.push(self.parse_expression(OpPrecedence::Lowest));
+            if &self.next_tok == &Token::Comma {
+                self.next_token();
+            }
+        }
+        self.next_token();
+        Expression::Call(Box::new(fn_exp), params)
     }
 
     fn parse_expression_stmt(&mut self) -> Statement {
@@ -290,7 +309,7 @@ mod test {
         let mut lexer = Lexer::new(String::from("if (x > 0) {let x = 1; x + 1} else (1+2)*3"));
         let mut parser = Parser::new(&mut lexer);
         assert_eq!(parser.parse_program().statements(), &vec![
-            Box::new(Statement::ExprStatement(Expression::IfExpr(
+            Box::new(Statement::ExprStatement(Expression::If(
                 Box::new(Expression::Gt(
                     Box::new(Expression::Ident(String::from("x"))),
                     Box::new(Expression::Int(0)))),
@@ -316,7 +335,7 @@ mod test {
         let mut lexer = Lexer::new(String::from("if (((0))) let x = (1);"));
         let mut parser = Parser::new(&mut lexer);
         assert_eq!(parser.parse_program().statements(), &vec![
-            Box::new(Statement::ExprStatement(Expression::IfExpr(
+            Box::new(Statement::ExprStatement(Expression::If(
                 Box::new(Expression::Int(0)),
                 Box::new(Statement::Let(String::from("x"), Expression::Int(1))),
                 Box::new(Statement::BlockStatement(Vec::new()))
@@ -333,7 +352,7 @@ mod test {
                 Box::new(Expression::Int(1)),
                 Box::new(Expression::Mul(
                     Box::new(Expression::Neg(
-                        Box::new(Expression::IfExpr(
+                        Box::new(Expression::If(
                             Box::new(Expression::Int(0)),
                             Box::new(Statement::ExprStatement(Expression::Int(1))),
                             Box::new(Statement::BlockStatement(Vec::new()))
@@ -352,10 +371,10 @@ mod test {
         assert_eq!(parser.parse_program().statements(), &vec![
             Box::new(Statement::Let(
                 String::from("x"),
-                Expression::FnExpr(Vec::new(), Box::new(Statement::ExprStatement(Expression::Int(1)))))),
+                Expression::FnDecl(Vec::new(), Box::new(Statement::ExprStatement(Expression::Int(1)))))),
             Box::new(Statement::Let(
                 String::from("y"),
-                Expression::FnExpr(
+                Expression::FnDecl(
                     vec![String::from("a"), String::from("b")],
                     Box::new(Statement::BlockStatement(vec![
                         Statement::Let(String::from("x"), Expression::Int(1)),
@@ -363,6 +382,22 @@ mod test {
                             Box::new(Expression::Ident(String::from("a"))),
                             Box::new(Expression::Ident(String::from("b"))),
                     ))]))))),
+        ]);
+    }
+
+    #[test]
+    fn test_fn_call() {
+        let mut lexer = Lexer::new(String::from("func(); func1(1); func2(1,2);"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(Expression::Call(
+                Box::new(Expression::Ident(String::from("func"))), vec![]))),
+            Box::new(Statement::ExprStatement(Expression::Call(
+                Box::new(Expression::Ident(String::from("func1"))),
+                vec![Expression::Int(1)]))),
+            Box::new(Statement::ExprStatement(Expression::Call(
+                Box::new(Expression::Ident(String::from("func2"))),
+                vec![Expression::Int(1), Expression::Int(2)]))),
         ]);
     }
 }

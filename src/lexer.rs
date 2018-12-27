@@ -132,7 +132,7 @@ impl Lexer {
     fn read_ident(&mut self) -> String {
         let mut ident = String::new();
         while let Some(c) = self.ch {
-            if !(c.is_alphabetic() || c == '_') {
+            if !(c.is_alphanumeric() || c == '_') {
                 break;
             }
             ident.push(c);
