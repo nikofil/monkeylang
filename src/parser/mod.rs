@@ -63,7 +63,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.cur_tok {
                 Token::Eof => break,
-                Token::Illegal => panic!("Illegal token"),
+                Token::Illegal => panic!("Illegal token {:?}", self.cur_tok),
                 _ => prog.push(self.parse_statement()),
             }
             self.next_token();
@@ -108,7 +108,7 @@ impl<'a> Parser<'a> {
         self.next_token();
         let if_st = self.parse_statement();
         let else_st = {
-            if &self.next_tok == &Token::Else {
+            if self.next_tok == Token::Else {
                 self.next_token();
                 self.next_token();
                 self.parse_statement()
@@ -122,9 +122,9 @@ impl<'a> Parser<'a> {
     fn parse_fn(&mut self) -> Expression {
         let mut params = Vec::new();
         assert_eq!(self.next_token(), &Token::Lparen);
-        while &self.next_tok != &Token::Rparen {
+        while self.next_tok != Token::Rparen {
             params.push(self.assert_ident());
-            if &self.next_tok == &Token::Comma {
+            if self.next_tok == Token::Comma {
                 self.next_token();
             }
         }
@@ -169,7 +169,7 @@ impl<'a> Parser<'a> {
             }).unwrap_or_else(|| panic!("Prefix operator not found: {:?}", &other))
         };
 
-        while &self.next_tok != &Token::Semicolon && op_prec < self.peek_precedence() {
+        while self.next_tok != Token::Semicolon && op_prec < self.peek_precedence() {
             if self.next_tok != Token::Lparen {
                 let infix = match exprs::infix_parser(&self.next_tok) {
                     None => break,
@@ -192,7 +192,7 @@ impl<'a> Parser<'a> {
         while self.next_tok != Token::Rparen {
             self.next_token();
             params.push(self.parse_expression(OpPrecedence::Lowest));
-            if &self.next_tok == &Token::Comma {
+            if self.next_tok == Token::Comma {
                 self.next_token();
             }
         }
