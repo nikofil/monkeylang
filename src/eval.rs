@@ -10,6 +10,7 @@ use std::fmt::Formatter;
 pub enum Value {
     Int(i32),
     Bool(bool),
+    FnDecl(Vec<String>, Box<Statement>),
     Null,
 }
 
@@ -20,11 +21,13 @@ impl Display for Value {
         match self {
             Int(i) => f.write_str(&format!("{}", i)),
             Bool(b) => f.write_str(&format!("{}", b)),
+            FnDecl(pars, stmt) => f.write_str(&format!("fn({})", pars.join(", "))),
             Null => f.write_str("null"),
         }
     }
 }
 
+#[derive(Clone)]
 pub struct State {
     state: HashMap<String, Value>,
 }
@@ -85,12 +88,57 @@ impl Eval for Statement {
     }
 }
 
+fn math_op(l: Option<Value>, r: Option<Value>, op: &Fn(i32, i32) -> i32) -> Value {
+    match (l, r) {
+        (Some(Int(lv)), Some(Int(rv))) => Int(op(lv, rv)),
+        _ => Null,
+    }
+}
+
+fn bool_op(l: Option<Value>, r: Option<Value>, op: &Fn(i32, i32) -> bool) -> Value {
+    match (l, r) {
+        (Some(Int(lv)), Some(Int(rv))) => Bool(op(lv, rv)),
+        _ => Null,
+    }
+}
+
 impl Eval for Expression {
     fn eval(&self, state: &mut State) -> Option<Value> {
         Some(match self {
             Expression::Int(i) => Int(*i),
             Expression::True => Bool(true),
             Expression::False => Bool(false),
+            Expression::Plus(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l + r),
+            Expression::Minus(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l - r),
+            Expression::Div(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l / r),
+            Expression::Mul(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l * r),
+            Expression::Eq(l, r) => bool_op(l.eval(state), r.eval(state), &|l, r| l == r),
+            Expression::Ne(l, r) => bool_op(l.eval(state), r.eval(state), &|l, r| l != r),
+            Expression::Lt(l, r) => bool_op(l.eval(state), r.eval(state), &|l, r| l < r),
+            Expression::Gt(l, r) => bool_op(l.eval(state), r.eval(state), &|l, r| l > r),
+            Expression::Ident(id) => state.get(&id).unwrap_or(&Null).clone(),
+            Expression::Neg(n) => if let Some(Int(i)) = n.eval(state) { Int(-i) } else { Null },
+            Expression::Not(n) => if let Some(Bool(b)) = n.eval(state) { Bool(!b) } else { Null },
+            Expression::If(cond, ifb, elb) => {
+                let cond_val = cond.eval(state);
+                match cond_val {
+                    Some(Bool(true)) => ifb.eval(state).unwrap_or(Null),
+                    Some(Bool(false)) => elb.eval(state).unwrap_or(Null),
+                    _ => Null,
+                }
+            },
+            Expression::FnDecl(pars, stmt) => FnDecl(pars.clone(), stmt.clone()),
+            Expression::Call(func, actual) => {
+                if let Some(FnDecl(formal, stmt)) = func.eval(state) {
+                    let mut fn_state = state.clone();
+                    for i in 0..std::cmp::min(actual.len(), formal.len()) {
+                        fn_state.set(&formal[i], actual[i].eval(state).unwrap_or(Null));
+                    }
+                    stmt.eval(&mut fn_state).unwrap_or(Null)
+                } else {
+                    Null
+                }
+            },
             _ => unimplemented!()
         })
     }
@@ -108,5 +156,6 @@ mod test {
     #[test]
     fn test_prims() {
         assert_eq!(eval("1").unwrap(), Int(1));
+        assert_eq!(eval("true").unwrap(), Bool(true));
     }
 }

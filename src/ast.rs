@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Int(i32),
     Plus(Box<Expression>, Box<Expression>),
@@ -19,7 +19,7 @@ pub enum Expression {
     Call(Box<Expression>, Vec<Expression>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(String, Expression),
     Ret(Expression),
