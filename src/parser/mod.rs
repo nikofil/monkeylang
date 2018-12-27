@@ -74,7 +74,6 @@ impl<'a> Parser<'a> {
         match self.cur_tok {
             Token::Let => self.parse_let(),
             Token::Ret => self.parse_ret(),
-            Token::If => self.parse_cond(),
             Token::Lbrace => self.parse_block(),
             _ => self.parse_expression_stmt(),
         }
@@ -96,7 +95,7 @@ impl<'a> Parser<'a> {
         rv
     }
 
-    fn parse_cond(&mut self) -> Statement {
+    fn parse_cond(&mut self) -> Expression {
         assert_eq!(self.next_token(), &Token::Lparen);
         self.next_token();
         let cond = self.parse_expression(OpPrecedence::Lowest);
@@ -104,14 +103,26 @@ impl<'a> Parser<'a> {
         self.next_token();
         let if_st = self.parse_statement();
         let else_st = {
-            if self.next_token() == &Token::Else {
+            if &self.next_tok == &Token::Else {
+                self.next_token();
                 self.next_token();
                 self.parse_statement()
             } else {
                 Statement::BlockStatement(Vec::new())
             }
         };
-        Statement::ExprStatement(Expression::IfExpr(Box::new(cond), Box::new(if_st), Box::new(else_st)))
+        Expression::IfExpr(Box::new(cond), Box::new(if_st), Box::new(else_st))
+    }
+
+    fn parse_fn(&mut self) -> Expression {
+        let mut params = Vec::new();
+        assert_eq!(self.next_token(), &Token::Lparen);
+        while &self.next_tok != &Token::Rparen {
+            params.push(self.assert_ident());
+        }
+        self.next_token();
+        self.next_token();
+        Expression::FnExpr(params, self.parse_statement())
     }
 
     fn parse_block(&mut self) -> Statement {
@@ -136,6 +147,8 @@ impl<'a> Parser<'a> {
             Token::Ident(s) => Expression::Ident(s),
             Token::True => Expression::True,
             Token::False => Expression::False,
+            Token::If => self.parse_cond(),
+            Token::Function => self.parse_fn(),
             Token::Lparen => {
                 self.next_token();
                 let exp = self.parse_expression(OpPrecedence::Lowest);
@@ -291,7 +304,6 @@ mod test {
         ]);
     }
 
-
     #[test]
     fn test_only_if() {
         let mut lexer = Lexer::new(String::from("if (((0))) let x = (1);"));
@@ -301,6 +313,27 @@ mod test {
                 Box::new(Expression::Int(0)),
                 Box::new(Statement::Let(String::from("x"), Expression::Int(1))),
                 Box::new(Statement::BlockStatement(Vec::new()))
+            )))
+        ]);
+    }
+
+    #[test]
+    fn test_if_precedence() {
+        let mut lexer = Lexer::new(String::from("1 == -(if (0) 1)*2"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(Expression::Eq(
+                Box::new(Expression::Int(1)),
+                Box::new(Expression::Mul(
+                    Box::new(Expression::Neg(
+                        Box::new(Expression::IfExpr(
+                            Box::new(Expression::Int(0)),
+                            Box::new(Statement::ExprStatement(Expression::Int(1))),
+                            Box::new(Statement::BlockStatement(Vec::new()))
+                        ))
+                    )),
+                    Box::new(Expression::Int(2)),
+                ))
             )))
         ]);
     }
