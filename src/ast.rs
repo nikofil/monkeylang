@@ -14,12 +14,14 @@ pub enum Expression {
     Not(Box<Expression>),
     True,
     False,
+    IfExpr(Box<Expression>, Box<Statement>, Box<Statement>),
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     Let(String, Expression),
     Ret(Expression),
+    BlockStatement(Vec<Statement>),
     ExprStatement(Expression),
 }
 

@@ -52,13 +52,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn assert_int(&mut self) -> i32 {
-        match self.next_token().clone() {
-            Token::Int(i) => i,
-            _ => panic!("Expected Int, got {:?}", self.cur_tok),
-        }
-    }
-
     fn next_token(&mut self) -> &Token {
         self.cur_tok = mem::replace(&mut self.next_tok, self.lexer.next_token());
         &self.cur_tok
@@ -81,6 +74,8 @@ impl<'a> Parser<'a> {
         match self.cur_tok {
             Token::Let => self.parse_let(),
             Token::Ret => self.parse_ret(),
+            Token::If => self.parse_cond(),
+            Token::Lbrace => self.parse_block(),
             _ => self.parse_expression_stmt(),
         }
     }
@@ -99,6 +94,32 @@ impl<'a> Parser<'a> {
         let rv = Statement::Ret(self.parse_expression(OpPrecedence::Lowest));
         assert_eq!(self.next_token(), &Token::Semicolon);
         rv
+    }
+
+    fn parse_cond(&mut self) -> Statement {
+        assert_eq!(self.next_token(), &Token::Lparen);
+        self.next_token();
+        let cond = self.parse_expression(OpPrecedence::Lowest);
+        assert_eq!(self.next_token(), &Token::Rparen);
+        self.next_token();
+        let if_st = self.parse_statement();
+        let else_st = {
+            if self.next_token() == &Token::Else {
+                self.next_token();
+                self.parse_statement()
+            } else {
+                Statement::BlockStatement(Vec::new())
+            }
+        };
+        Statement::ExprStatement(Expression::IfExpr(Box::new(cond), Box::new(if_st), Box::new(else_st)))
+    }
+
+    fn parse_block(&mut self) -> Statement {
+        let mut v = Vec::new();
+        while self.next_token() != &Token::Rbrace {
+            v.push(self.parse_statement());
+        }
+        Statement::BlockStatement(v)
     }
 
     fn cur_precedence(&self) -> OpPrecedence {
@@ -126,7 +147,6 @@ impl<'a> Parser<'a> {
                 prefix_fn(self.parse_expression(OpPrecedence::Prefix))
             }).unwrap_or_else(|| panic!("Prefix operator not found: {:?}", &other))
         };
-        println!("left {:?} {:?}", &left, &op_prec);
 
         while &self.next_tok != &Token::Semicolon && op_prec < self.peek_precedence() {
             let infix = match exprs::infix_parser(&self.next_tok) {
@@ -136,10 +156,8 @@ impl<'a> Parser<'a> {
             self.next_token();
             let prec = self.cur_precedence();
             self.next_token();
-            println!("next {:?}", &self.cur_tok);
             left = infix(left, self.parse_expression(prec));
         }
-        println!("ret {:?}", &left);
         left
     }
 
@@ -230,7 +248,6 @@ mod test {
         ]);
     }
 
-
     #[test]
     fn test_paren() {
         let mut lexer = Lexer::new(String::from("(x * (y + z)) == true"));
@@ -245,6 +262,32 @@ mod test {
                     ))
                 )
             ), Box::new(Expression::True))))
+        ]);
+    }
+
+    #[test]
+    fn test_cond() {
+        let mut lexer = Lexer::new(String::from("if (x > 0) {let x = 1; x + 1} else (1+2)*3"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(Expression::IfExpr(
+                Box::new(Expression::Gt(
+                    Box::new(Expression::Ident(String::from("x"))),
+                    Box::new(Expression::Int(0)))),
+                Box::new(Statement::BlockStatement(vec![
+                    Statement::Let(String::from("x"), Expression::Int(1)),
+                    Statement::ExprStatement(Expression::Plus(
+                        Box::new(Expression::Ident(String::from("x"))),
+                        Box::new(Expression::Int(1)),
+                    )),
+                ])),
+                Box::new(Statement::ExprStatement(Expression::Mul(
+                    Box::new(Expression::Plus(
+                        Box::new(Expression::Int(1)),
+                        Box::new(Expression::Int(2)),
+                    )),
+                    Box::new(Expression::Int(3))))),
+            )))
         ]);
     }
 }
