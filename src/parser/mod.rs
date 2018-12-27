@@ -290,4 +290,18 @@ mod test {
             )))
         ]);
     }
+
+
+    #[test]
+    fn test_only_if() {
+        let mut lexer = Lexer::new(String::from("if (((0))) let x = (1);"));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::ExprStatement(Expression::IfExpr(
+                Box::new(Expression::Int(0)),
+                Box::new(Statement::Let(String::from("x"), Expression::Int(1))),
+                Box::new(Statement::BlockStatement(Vec::new()))
+            )))
+        ]);
+    }
 }
