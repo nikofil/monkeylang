@@ -14,6 +14,7 @@ enum OpPrecedence {
     Prod,
     Prefix,
     Call,
+    Index,
 }
 
 pub struct Parser<'a> {
@@ -34,6 +35,7 @@ lazy_static! {
         opp.insert(Token::Mul, OpPrecedence::Prod);
         opp.insert(Token::Div, OpPrecedence::Prod);
         opp.insert(Token::Lparen, OpPrecedence::Call);
+        opp.insert(Token::Lbracket, OpPrecedence::Index);
         opp
     };
 }
@@ -185,17 +187,23 @@ impl<'a> Parser<'a> {
         };
 
         while self.next_tok != Token::Semicolon && op_prec < self.peek_precedence() {
-            if self.next_tok != Token::Lparen {
-                let infix = match exprs::infix_parser(&self.next_tok) {
-                    None => break,
-                    Some(i) => i,
-                };
-                self.next_token();
-                let prec = self.cur_precedence();
-                self.next_token();
-                left = infix(left, self.parse_expression(prec));
-            } else {
-                left = self.parse_call(left);
+            match self.next_tok {
+                Token::Lparen => {
+                    left = self.parse_call(left);
+                },
+                Token::Lbracket => {
+                    left = self.parse_index(left);
+                },
+                _ => {
+                    let infix = match exprs::infix_parser(&self.next_tok) {
+                        None => break,
+                        Some(i) => i,
+                    };
+                    self.next_token();
+                    let prec = self.cur_precedence();
+                    self.next_token();
+                    left = infix(left, self.parse_expression(prec));
+                }
             }
         }
         left
@@ -213,6 +221,14 @@ impl<'a> Parser<'a> {
         }
         self.next_token();
         Expression::Call(Box::new(fn_exp), params)
+    }
+
+    fn parse_index(&mut self, arr_exp: Expression) -> Expression {
+        self.next_token();
+        self.next_token();
+        let index = self.parse_expression(OpPrecedence::Lowest);
+        assert_eq!(self.next_token(), &Token::Rbracket);
+        Expression::Index(Box::new(arr_exp), Box::new(index))
     }
 
     fn parse_expression_stmt(&mut self) -> Statement {

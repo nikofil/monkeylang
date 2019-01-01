@@ -191,6 +191,13 @@ impl Eval for Expression {
             },
             Expression::FnDecl(pars, stmt) => FnDecl(pars.clone(), stmt.clone()),
             Expression::Array(elems) => Array(elems.iter().map(|el| el.eval(state, writer).unwrap_or(Null)).collect::<Vec<Value>>()),
+            Expression::Index(arr, index) => {
+                if let (Some(Array(a)), Some(Int(i))) = (arr.eval(state, writer), index.eval(state, writer)) {
+                    a.get(i as usize).unwrap_or(&Null).clone()
+                } else {
+                    Null
+                }
+            },
             Expression::Call(func, actual) => {
                 match func.eval(state, writer) {
                     Some(FnDecl(formal, stmt)) => {
@@ -252,6 +259,11 @@ mod test {
     #[test]
     fn test_higher_order() {
         assert_eq!(eval("let twice = fn (f, x) f(f(x)); twice(fn(x) x*2, 10)").unwrap(), Int(40));
+    }
+
+    #[test]
+    fn test_arr() {
+        assert_eq!(eval("let x = [1, 2, \"a\", \"b\", 5]; let y = x[0] + x[1] + x[4]; x[2] + x[3] + y").unwrap(), Str(String::from("ab8")));
     }
 
     #[test]

@@ -19,6 +19,7 @@ pub enum Expression {
     Call(Box<Expression>, Vec<Expression>),
     String(String),
     Array(Vec<Expression>),
+    Index(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
