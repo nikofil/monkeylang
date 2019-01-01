@@ -157,6 +157,7 @@ impl<'a> Parser<'a> {
             Token::False => Expression::False,
             Token::If => self.parse_cond(),
             Token::Function => self.parse_fn(),
+            Token::String(s) => Expression::String(s),
             Token::Lparen => {
                 self.next_token();
                 let exp = self.parse_expression(OpPrecedence::Lowest);
@@ -398,6 +399,19 @@ mod test {
             Box::new(Statement::ExprStatement(Expression::Call(
                 Box::new(Expression::Ident(String::from("func2"))),
                 vec![Expression::Int(1), Expression::Int(2)]))),
+        ]);
+    }
+
+    #[test]
+    fn test_str() {
+        let mut lexer = Lexer::new(String::from("let x = \"a b \" + \" c d \""));
+        let mut parser = Parser::new(&mut lexer);
+        assert_eq!(parser.parse_program().statements(), &vec![
+            Box::new(Statement::Let(
+                String::from("x"),
+                Expression::Plus(
+                    Box::new(Expression::String(String::from("a b "))),
+                    Box::new(Expression::String(String::from(" c d ")))))),
         ]);
     }
 }

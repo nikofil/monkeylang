@@ -10,6 +10,7 @@ use std::fmt::Formatter;
 pub enum Value {
     Int(i32),
     Bool(bool),
+    Str(String),
     FnDecl(Vec<String>, Box<Statement>),
     RetVal(Box<Value>),
     Null,
@@ -31,6 +32,7 @@ impl Display for Value {
         match self {
             Int(i) => f.write_str(&format!("{}", i)),
             Bool(b) => f.write_str(&format!("{}", b)),
+            Str(s) => f.write_str(&format!("{}", s)),
             FnDecl(pars, _stmt) => f.write_str(&format!("fn({})", pars.join(", "))),
             RetVal(v) => v.fmt(f),
             Null => f.write_str("null"),
@@ -91,7 +93,6 @@ impl Eval for Statement {
                 let mut val = None;
                 for st in stmts {
                     val = st.eval(state);
-                    println!("exec {:?} = {:?}", st, val);
                     if let Some(RetVal(_)) = val {
                         break;
                     }
@@ -123,7 +124,15 @@ impl Eval for Expression {
             Expression::Int(i) => Int(*i),
             Expression::True => Bool(true),
             Expression::False => Bool(false),
-            Expression::Plus(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l + r),
+            Expression::Plus(l, r) => {
+                let lev = l.eval(state);
+                let rev = r.eval(state);
+                match (lev, rev) {
+                    (Some(Str(s)), rev) => Str(format!("{}{}", s, rev.unwrap_or(Null))),
+                    (lev, Some(Str(s))) => Str(format!("{}{}", lev.unwrap_or(Null), s)),
+                    (lev, rev) => math_op(lev, rev, &|l, r| l + r),
+                }
+            },
             Expression::Minus(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l - r),
             Expression::Div(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l / r),
             Expression::Mul(l, r) => math_op(l.eval(state), r.eval(state), &|l, r| l * r),
@@ -132,6 +141,7 @@ impl Eval for Expression {
             Expression::Lt(l, r) => bool_op(l.eval(state), r.eval(state), &|l, r| l < r),
             Expression::Gt(l, r) => bool_op(l.eval(state), r.eval(state), &|l, r| l > r),
             Expression::Ident(id) => state.get(&id).unwrap_or(&Null).clone(),
+            Expression::String(s) => Value::Str(s.clone()),
             Expression::Neg(n) => if let Some(Int(i)) = n.eval(state) { Int(-i) } else { Null },
             Expression::Not(n) => if let Some(Bool(b)) = n.eval(state) { Bool(!b) } else { Null },
             Expression::If(cond, ifb, elb) => {
@@ -186,6 +196,11 @@ mod test {
     #[test]
     fn test_stack() {
         assert_eq!(eval("let x = 10; let f = fn (x) { let x = 2*x+1; x }; let y = f(x); y + x;").unwrap(), Int(31));
+    }
+
+    #[test]
+    fn test_str() {
+        assert_eq!(eval("let a = \" hello \"; let b = \"world \"; a + b + 1").unwrap(), Str(String::from(" hello world 1")));
     }
 
     #[test]

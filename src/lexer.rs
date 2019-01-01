@@ -29,6 +29,7 @@ pub enum Token {
     If,
     Else,
     Ret,
+    String(String),
 }
 
 pub struct Lexer {
@@ -106,6 +107,7 @@ impl Lexer {
                 '*' => Token::Mul,
                 '<' => Token::Lt,
                 '>' => Token::Gt,
+                '"' => Token::String(self.read_str()),
                 c => {
                     if c.is_alphabetic() || c == '_' {
                         let ident = self.read_ident();
@@ -127,6 +129,19 @@ impl Lexer {
             self.read_char();
         }
         ret
+    }
+
+    fn read_str(&mut self) -> String {
+        let mut str = String::new();
+        self.read_char();
+        while let Some(c) = self.ch {
+            if c == '"' {
+                break;
+            }
+            str.push(c);
+            self.read_char();
+        }
+        str
     }
 
     fn read_ident(&mut self) -> String {
