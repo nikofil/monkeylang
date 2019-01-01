@@ -18,6 +18,7 @@ pub enum Expression {
     FnDecl(Vec<String>, Box<Statement>),
     Call(Box<Expression>, Vec<Expression>),
     String(String),
+    Array(Vec<Expression>),
 }
 
 #[derive(Debug, PartialEq, Clone)]

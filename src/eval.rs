@@ -15,6 +15,7 @@ pub enum Value {
     FnDecl(Vec<String>, Box<Statement>),
     FnBuiltin(String, Box<fn(Vec<Option<Value>>) -> (Box<Value>, Option<String>)>),
     RetVal(Box<Value>),
+    Array(Vec<Value>),
     Null,
 }
 
@@ -38,6 +39,7 @@ impl Display for Value {
             FnDecl(pars, _stmt) => f.write_str(&format!("fn({})", pars.join(", "))),
             FnBuiltin(ident, _) => f.write_str(&format!("builtin {}", ident)),
             RetVal(v) => v.fmt(f),
+            Array(el) => f.write_str(&format!("[{}]", el.iter().map(|el| format!("{}", el)).collect::<Vec<String>>().join(", "))),
             Null => f.write_str("null"),
         }
     }
@@ -54,6 +56,7 @@ impl State {
         state.insert(String::from("len"), Value::FnBuiltin(String::from("len"), Box::new(|v| {
             (Box::new(match v.get(0) {
                 Some(Some(Str(s))) => Int(s.len() as i32),
+                Some(Some(Array(a))) => Int(a.len() as i32),
                 _ => Null,
             }), None)
         })));
@@ -156,6 +159,12 @@ impl Eval for Expression {
                 let lev = l.eval(state, writer);
                 let rev = r.eval(state, writer);
                 match (lev, rev) {
+                    (Some(Array(a1)), Some(Array(a2))) => {
+                        let mut all = Vec::new();
+                        all.extend(a1.clone());
+                        all.extend(a2.clone());
+                        Array(all)
+                    },
                     (Some(Str(s)), rev) => Str(format!("{}{}", s, rev.unwrap_or(Null))),
                     (lev, Some(Str(s))) => Str(format!("{}{}", lev.unwrap_or(Null), s)),
                     (lev, rev) => math_op(lev, rev, &|l, r| l + r),
@@ -181,6 +190,7 @@ impl Eval for Expression {
                 }
             },
             Expression::FnDecl(pars, stmt) => FnDecl(pars.clone(), stmt.clone()),
+            Expression::Array(elems) => Array(elems.iter().map(|el| el.eval(state, writer).unwrap_or(Null)).collect::<Vec<Value>>()),
             Expression::Call(func, actual) => {
                 match func.eval(state, writer) {
                     Some(FnDecl(formal, stmt)) => {
@@ -247,6 +257,7 @@ mod test {
     #[test]
     fn test_len() {
         assert_eq!(eval("let x = \"a\"; let x = x + \" \"; len(x + 1)").unwrap(), Int(3));
+        assert_eq!(eval("let x = [1,2,3]; len(x + [\"a\", 5])").unwrap(), Int(5));
     }
 
     #[test]

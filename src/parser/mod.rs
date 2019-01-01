@@ -133,6 +133,19 @@ impl<'a> Parser<'a> {
         Expression::FnDecl(params, Box::new(self.parse_statement()))
     }
 
+    fn parse_array(&mut self) -> Expression {
+        let mut elems = Vec::new();
+        while self.next_tok != Token::Rbracket {
+            self.next_token();
+            elems.push(self.parse_expression(OpPrecedence::Lowest));
+            if self.next_tok == Token::Comma {
+                self.next_token();
+            }
+        }
+        self.next_token();
+        Expression::Array(elems)
+    }
+
     fn parse_block(&mut self) -> Statement {
         let mut v = Vec::new();
         while self.next_token() != &Token::Rbrace {
@@ -157,6 +170,7 @@ impl<'a> Parser<'a> {
             Token::False => Expression::False,
             Token::If => self.parse_cond(),
             Token::Function => self.parse_fn(),
+            Token::Lbracket => self.parse_array(),
             Token::String(s) => Expression::String(s),
             Token::Lparen => {
                 self.next_token();

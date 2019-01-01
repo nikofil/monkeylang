@@ -12,6 +12,8 @@ pub enum Token {
     Semicolon,
     Lparen,
     Rparen,
+    Lbracket,
+    Rbracket,
     Lbrace,
     Rbrace,
     Function,
@@ -92,6 +94,8 @@ impl Lexer {
                 ';' => Token::Semicolon,
                 '(' => Token::Lparen,
                 ')' => Token::Rparen,
+                '[' => Token::Lbracket,
+                ']' => Token::Rbracket,
                 '{' => Token::Lbrace,
                 '}' => Token::Rbrace,
                 '!' => {
