@@ -8,6 +8,6 @@ pub fn start_repl() {
         print!(">> ");
         std::io::stdout().flush().unwrap();
         std::io::stdin().read_line(&mut input).unwrap();
-        state.eval(&input).map(|out| println!("-> {}\n", out));
+        state.eval(&input, &mut std::io::stdout()).map(|out| println!("-> {}\n", out));
     }
 }
