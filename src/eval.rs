@@ -78,7 +78,14 @@ impl State {
             });
             (Box::new(Null), Some(out))
         })));
-        State{ state }
+        let mut state = State{ state };
+        let mut out: Vec<u8> = Vec::new();
+        state.eval("let first = fn(a) a[0]", &mut out);
+        state.eval("let last = fn(a) a[len(a)-1]", &mut out);
+        state.eval("let tail = fn(a) {let x = fn(a, i) {if (i < len(a)) [a[i]] + x(a, i+1) else []}; x(a, 1)}", &mut out);
+        state.eval("let push = fn(a, x) a + [x]", &mut out);
+        state.eval("let map = fn(a, f) if (len(a) > 0) [f(first(a))] + map(tail(a), f) else []", &mut out);
+        state
     }
 
     fn set(&mut self, name: &String, value: Value) {
@@ -277,5 +284,15 @@ mod test {
         let mut out: Vec<u8> = Vec::new();
         State::new().eval("print(1, \"a\")", &mut out);
         assert_eq!(String::from_utf8(out).unwrap(), "1a");
+    }
+
+    #[test]
+    fn test_arr_fns() {
+        assert_eq!(eval("let x = [1,2,3,4]; let x = push(x, 0); [first(x), last(x), tail(x)]").unwrap(), Array(vec![Int(1), Int(0), Array(vec![Int(2), Int(3), Int(4), Int(0)])]));
+    }
+
+    #[test]
+    fn test_arr_map() {
+        assert_eq!(eval("map([1,2,3,4], fn(x) x*2+1)").unwrap(), Array(vec![Int(3), Int(5), Int(7), Int(9)]));
     }
 }
