@@ -99,6 +99,14 @@ impl State {
             };
             (Box::new(nh.unwrap_or(Null)), None)
         })));
+        state.insert(String::from("keys"), Value::FnBuiltin(String::from("keys"), Box::new(|v| {
+            let keys = if let Some(Some(Hash(h))) = v.get(0) {
+                Some(Array(h.keys().map(|k| Str(k.clone())).collect()))
+            } else {
+                None
+            };
+            (Box::new(keys.unwrap_or(Null)), None)
+        })));
         let mut state = State{ state };
         let mut out: Vec<u8> = Vec::new();
         state.eval("let first = fn(a) a[0]", &mut out);
@@ -177,6 +185,17 @@ fn bool_op(l: Option<Value>, r: Option<Value>, op: &Fn(i32, i32) -> bool) -> Val
     }
 }
 
+fn test_eq(l: Option<Value>, r: Option<Value>) -> bool {
+    match (l, r) {
+        (Some(Int(lv)), Some(Int(rv))) => lv == rv,
+        (Some(Bool(lv)), Some(Bool(rv))) => lv == rv,
+        (Some(Str(lv)), Some(Str(rv))) => lv == rv,
+        (Some(Array(lv)), Some(Array(rv))) => lv == rv,
+        (Some(Hash(lv)), Some(Hash(rv))) => lv == rv,
+        _ => false,
+    }
+}
+
 impl Eval for Expression {
     fn eval(&self, state: &mut State, writer: &mut Write) -> Option<Value> {
         Some(match self {
@@ -209,8 +228,8 @@ impl Eval for Expression {
             Expression::Minus(l, r) => math_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l - r),
             Expression::Div(l, r) => math_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l / r),
             Expression::Mul(l, r) => math_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l * r),
-            Expression::Eq(l, r) => bool_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l == r),
-            Expression::Ne(l, r) => bool_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l != r),
+            Expression::Eq(l, r) => Bool(test_eq(l.eval(state, writer), r.eval(state, writer))),
+            Expression::Ne(l, r) => Bool(!test_eq(l.eval(state, writer), r.eval(state, writer))),
             Expression::Lt(l, r) => bool_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l < r),
             Expression::Gt(l, r) => bool_op(l.eval(state, writer), r.eval(state, writer), &|l, r| l > r),
             Expression::Ident(id) => state.get(&id).unwrap_or(&Null).clone(),
@@ -328,5 +347,18 @@ mod test {
     #[test]
     fn test_hash() {
         assert_eq!(eval("let h = {\"a\": 1, true: 2}; let h2 = insert(h, true, 1); insert(h2, 0, h2)[0][true]").unwrap(), Int(1));
+    }
+
+    #[test]
+    fn test_hash_keys() {
+        let keys = eval("keys({\"a\": 1, true: 2, 3: 3})").unwrap();
+        if let Array(vals) = keys {
+            assert_eq!(vals.len(), 3);
+            assert!(vals.contains(&Str(String::from("a"))));
+            assert!(vals.contains(&Str(String::from("true"))));
+            assert!(vals.contains(&Str(String::from("3"))));
+        } else {
+            panic!("keys should return an array");
+        }
     }
 }
