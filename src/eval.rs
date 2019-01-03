@@ -16,6 +16,7 @@ pub enum Value {
     FnBuiltin(String, Box<fn(Vec<Option<Value>>) -> (Box<Value>, Option<String>)>),
     RetVal(Box<Value>),
     Array(Vec<Value>),
+    Hash(HashMap<String, Value>),
     Null,
 }
 
@@ -40,6 +41,7 @@ impl Display for Value {
             FnBuiltin(ident, _) => f.write_str(&format!("builtin {}", ident)),
             RetVal(v) => v.fmt(f),
             Array(el) => f.write_str(&format!("[{}]", el.iter().map(|el| format!("{}", el)).collect::<Vec<String>>().join(", "))),
+            Hash(h) => f.write_str(&format!("{{{}}}", h.iter().map(|(key, value)| format!("{}: {}", key, value)).collect::<Vec<String>>().join(", "))),
             Null => f.write_str("null"),
         }
     }
@@ -77,6 +79,25 @@ impl State {
                 }
             });
             (Box::new(Null), Some(out))
+        })));
+        state.insert(String::from("insert"), Value::FnBuiltin(String::from("insert"), Box::new(|pars| {
+            let nh = if pars.len() == 3 {
+                pars[0].as_ref().and_then(|h|
+                    pars[1].as_ref().and_then(|k|
+                        pars[2].as_ref().and_then(|v|
+                            if let Hash(hash) = h {
+                                let mut new_hash = hash.clone();
+                                new_hash.insert(k.to_string(), v.clone());
+                                Some(Hash(new_hash))
+                            } else {
+                                None
+                            })
+                    )
+                )
+            } else {
+                None
+            };
+            (Box::new(nh.unwrap_or(Null)), None)
         })));
         let mut state = State{ state };
         let mut out: Vec<u8> = Vec::new();
@@ -162,6 +183,14 @@ impl Eval for Expression {
             Expression::Int(i) => Int(*i),
             Expression::True => Bool(true),
             Expression::False => Bool(false),
+            Expression::Hash(v) => {
+                let mut h = HashMap::new();
+                v.iter().for_each(|(k, v)| {
+                    k.eval(state, writer).map(|k|
+                        v.eval(state, writer).map(|v| h.insert(k.to_string(), v)));
+                });
+                Hash(h)
+            },
             Expression::Plus(l, r) => {
                 let lev = l.eval(state, writer);
                 let rev = r.eval(state, writer);
@@ -199,10 +228,10 @@ impl Eval for Expression {
             Expression::FnDecl(pars, stmt) => FnDecl(pars.clone(), stmt.clone()),
             Expression::Array(elems) => Array(elems.iter().map(|el| el.eval(state, writer).unwrap_or(Null)).collect::<Vec<Value>>()),
             Expression::Index(arr, index) => {
-                if let (Some(Array(a)), Some(Int(i))) = (arr.eval(state, writer), index.eval(state, writer)) {
-                    a.get(i as usize).unwrap_or(&Null).clone()
-                } else {
-                    Null
+                match (arr.eval(state, writer), index.eval(state, writer)) {
+                    (Some(Array(a)), Some(Int(i))) => a.get(i as usize).unwrap_or(&Null).clone(),
+                    (Some(Hash(hash)), Some(val)) => hash.get(&val.to_string()).unwrap_or(&Null).clone(),
+                    _ => Null,
                 }
             },
             Expression::Call(func, actual) => {
@@ -294,5 +323,10 @@ mod test {
     #[test]
     fn test_arr_map() {
         assert_eq!(eval("map([1,2,3,4], fn(x) x*2+1)").unwrap(), Array(vec![Int(3), Int(5), Int(7), Int(9)]));
+    }
+
+    #[test]
+    fn test_hash() {
+        assert_eq!(eval("let h = {\"a\": 1, true: 2}; let h2 = insert(h, true, 1); insert(h2, 0, h2)[0][true]").unwrap(), Int(1));
     }
 }

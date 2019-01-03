@@ -148,6 +148,23 @@ impl<'a> Parser<'a> {
         Expression::Array(elems)
     }
 
+    fn parse_hash(&mut self) -> Expression {
+        let mut hash = Vec::new();
+        while self.next_tok != Token::Rbrace {
+            self.next_token();
+            let key = self.parse_expression(OpPrecedence::Lowest);
+            assert_eq!(self.next_token(), &Token::Colon);
+            self.next_token();
+            let value = self.parse_expression(OpPrecedence::Lowest);
+            hash.push((key, value));
+            if self.next_tok == Token::Comma {
+                self.next_token();
+            }
+        }
+        self.next_token();
+        Expression::Hash(hash)
+    }
+
     fn parse_block(&mut self) -> Statement {
         let mut v = Vec::new();
         while self.next_token() != &Token::Rbrace {
@@ -173,6 +190,7 @@ impl<'a> Parser<'a> {
             Token::If => self.parse_cond(),
             Token::Function => self.parse_fn(),
             Token::Lbracket => self.parse_array(),
+            Token::Lbrace => self.parse_hash(),
             Token::String(s) => Expression::String(s),
             Token::Lparen => {
                 self.next_token();
