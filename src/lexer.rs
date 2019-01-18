@@ -29,6 +29,7 @@ pub enum Token {
     Gt,
     True,
     False,
+    Null,
     If,
     Else,
     Ret,
@@ -125,6 +126,7 @@ impl Lexer {
         keywords.insert("fn", Token::Function);
         keywords.insert("true", Token::True);
         keywords.insert("false", Token::False);
+        keywords.insert("null", Token::Null);
         keywords.insert("if", Token::If);
         keywords.insert("else", Token::Else);
         keywords.insert("return", Token::Ret);

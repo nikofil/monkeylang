@@ -195,6 +195,7 @@ fn test_eq(l: Option<Value>, r: Option<Value>) -> bool {
         (Some(Str(lv)), Some(Str(rv))) => lv == rv,
         (Some(Array(lv)), Some(Array(rv))) => lv == rv,
         (Some(Hash(lv)), Some(Hash(rv))) => lv == rv,
+        (Some(Null), Some(Null)) => true,
         _ => false,
     }
 }
@@ -205,6 +206,7 @@ impl Eval for Expression {
             Expression::Int(i) => Int(*i),
             Expression::True => Bool(true),
             Expression::False => Bool(false),
+            Expression::Null => Null,
             Expression::Hash(v) => {
                 let mut h = HashMap::new();
                 v.iter().for_each(|(k, v)| {

@@ -14,6 +14,7 @@ pub enum Expression {
     Not(Box<Expression>),
     True,
     False,
+    Null,
     If(Box<Expression>, Box<Statement>, Box<Statement>),
     FnDecl(Vec<String>, Box<Statement>),
     Call(Box<Expression>, Vec<Expression>),

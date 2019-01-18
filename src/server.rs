@@ -108,14 +108,14 @@ fn parse_file(path: PathBuf, get_args: Vec<(&str, &str)>, post_args: Vec<(&str, 
             let mut is_ml = false;
             contents.lines().for_each(|line| {
                 if is_ml {
-                    if line == "%>" {
+                    if line.trim() == "%>" {
                         is_ml = false;
                     } else {
                         for tok in Lexer::lex_str(line) {
                             line_buf.push_back(tok);
                         }
                     }
-                } else if line == "<%" {
+                } else if line.trim() == "<%" {
                     is_ml = true;
                 } else {
                     line_buf.push_back(Token::Ident(String::from("println")));

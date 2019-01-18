@@ -187,6 +187,7 @@ impl<'a> Parser<'a> {
             Token::Ident(s) => Expression::Ident(s),
             Token::True => Expression::True,
             Token::False => Expression::False,
+            Token::Null => Expression::Null,
             Token::If => self.parse_cond(),
             Token::Function => self.parse_fn(),
             Token::Lbracket => self.parse_array(),
