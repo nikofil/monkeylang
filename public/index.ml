@@ -7,7 +7,10 @@
   <body>
     <h1>Welcome!</h1>
     <p>
-        <a href="/calc.ml">Calculator</a>
+        <a href="/add.ml">Addition</a>
+    </p>
+    <p>
+        <a href="/fib.ml">Fibonacci</a>
     </p>
   </body>
 </html>

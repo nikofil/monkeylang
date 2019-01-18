@@ -2,12 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Calculator</title>
+    <title>Addition</title>
   </head>
   <body>
-<%
-    println(post["a"] + post["b"])
-%>
+    <%
+        if (post["a"] != null) {
+    %>
+    Result is:
+    <%
+            println(post["a"] + post["b"])
+        }
+    %>
     <form action="#" method="POST">
         <input name="a" />
         <input name="b" />
