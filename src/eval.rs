@@ -5,7 +5,10 @@ use ast::Statement::*;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::fmt::Result;
 use std::io::Write;
+use std::io;
+use std::cmp;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -32,7 +35,7 @@ impl Value {
 }
 
 impl Display for Value {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             Int(i) => f.write_str(&format!("{}", i)),
             Bool(b) => f.write_str(&format!("{}", b)),
@@ -257,7 +260,7 @@ impl Eval for Expression {
                 match func.eval(state, writer) {
                     Some(FnDecl(formal, stmt)) => {
                         let mut fn_state = state.clone();
-                        for i in 0..std::cmp::min(actual.len(), formal.len()) {
+                        for i in 0..cmp::min(actual.len(), formal.len()) {
                             fn_state.set(&formal[i], actual[i].eval(state, writer).unwrap_or(Null));
                         }
                         stmt.eval(&mut fn_state, writer).unwrap_or(Null).unret()
@@ -275,7 +278,7 @@ impl Eval for Expression {
 }
 
 pub fn eval(input: &str) -> Option<Value> {
-    let mut out = std::io::stdout();
+    let mut out = io::stdout();
     State::new().eval(input, &mut out).map(|v| v.clone())
 }
 

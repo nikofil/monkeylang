@@ -1,4 +1,5 @@
 use eval::State;
+use std::io;
 use std::io::Write;
 
 pub fn start_repl() {
@@ -6,8 +7,8 @@ pub fn start_repl() {
     loop {
         let mut input = String::new();
         print!(">> ");
-        std::io::stdout().flush().unwrap();
-        std::io::stdin().read_line(&mut input).unwrap();
-        state.eval(&input, &mut std::io::stdout()).map(|out| println!("-> {}\n", out));
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut input).unwrap();
+        state.eval(&input, &mut io::stdout()).map(|out| println!("-> {}\n", out));
     }
 }
