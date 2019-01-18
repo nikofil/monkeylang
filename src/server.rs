@@ -1,13 +1,14 @@
 use std::fs::File;
 use std::env;
 use std::path::Path;
-use std::io::prelude::{ Read, Write };
+use std::io::{ Read, Write };
 use std::net::TcpListener;
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::collections::VecDeque;
 use lexer::{ Token, Lexer, TokenLexer };
 use parser::Parser;
+use eval::{ State, Eval };
 
 pub fn serve(interface: String, port: u16) {
     let listener = TcpListener::bind(format!("{}:{}", interface, port)).unwrap();
@@ -107,15 +108,17 @@ fn parse_file(path: PathBuf) -> Option<String> {
                 } else if line == "<%" {
                     is_ml = true;
                 } else {
-                    line_buf.push_back(Token::Ident(String::from("print_ln")));
+                    line_buf.push_back(Token::Ident(String::from("println")));
                     line_buf.push_back(Token::Lparen);
                     line_buf.push_back(Token::String(String::from(line)));
                     line_buf.push_back(Token::Rparen);
                 }
             });
-            let prog = Parser::new(&mut ScriptLexer(line_buf)).parse_program();
-            println!("{:?}", prog.statements());
-            Some(String::from("coo"))
+            let program = Parser::new(&mut ScriptLexer(line_buf)).parse_program();
+            let mut output: Vec<u8> = Vec::new();
+            program.eval(&mut State::new(), &mut output).map(|_| {
+                String::from_utf8_lossy(&output).to_string()
+            })
         },
         _ => Some(contents),
     }

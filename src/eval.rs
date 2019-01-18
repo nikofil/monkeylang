@@ -136,7 +136,7 @@ impl State {
     }
 }
 
-trait Eval {
+pub trait Eval {
     fn eval(&self, state: &mut State, writer: &mut Write) -> Option<Value>;
 }
 
