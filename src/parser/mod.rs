@@ -1,6 +1,6 @@
 mod exprs;
 
-use lexer::{ Lexer, Token, TokenLexer };
+use lexer::{ Token, TokenLexer };
 use ast::*;
 use std::mem;
 use std::collections::HashMap;
@@ -261,6 +261,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use lexer::Lexer;
 
     #[test]
     fn test_let() {

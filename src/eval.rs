@@ -120,11 +120,11 @@ impl State {
         state
     }
 
-    fn set(&mut self, name: &String, value: Value) {
+    pub fn set(&mut self, name: &String, value: Value) {
         self.state.insert(name.clone(), value);
     }
 
-    fn get(&self, name: &String) -> Option<&Value> {
+    pub fn get(&self, name: &String) -> Option<&Value> {
         self.state.get(name)
     }
 
