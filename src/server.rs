@@ -4,6 +4,10 @@ use std::path::Path;
 use std::io::prelude::{ Read, Write };
 use std::net::TcpListener;
 use std::net::TcpStream;
+use std::path::PathBuf;
+use std::collections::VecDeque;
+use lexer::{ Token, Lexer, TokenLexer };
+use parser::Parser;
 
 pub fn serve(interface: String, port: u16) {
     let listener = TcpListener::bind(format!("{}:{}", interface, port)).unwrap();
@@ -41,9 +45,7 @@ fn handle_connection(mut stream: TcpStream) {
                         let path = file_path.canonicalize().ok()?;
                         println!("{} {}", path.to_str()?, public_path.to_str()?);
                         if path.starts_with(public_path) {
-                            let mut contents = String::new();
-                            File::open(path).ok()?.read_to_string(&mut contents).ok()?;
-                            Some(contents)
+                            parse_file(path)
                         } else {
                             None
                         }
@@ -76,4 +78,45 @@ fn parse_form_args(args: &str) -> Vec<(&str, &str)> {
         let val = arg_split.next().unwrap_or("");
         (name, val)
     }).collect::<Vec<(&str, &str)>>()
+}
+
+struct ScriptLexer(VecDeque<Token>);
+
+impl TokenLexer for ScriptLexer {
+    fn next_token(&mut self) -> Token {
+        self.0.pop_front().unwrap_or(Token::Eof)
+    }
+}
+
+fn parse_file(path: PathBuf) -> Option<String> {
+    let mut contents = String::new();
+    File::open(path.clone()).ok()?.read_to_string(&mut contents).ok()?;
+    match path.extension() {
+        Some(ext) if ext == "ml" => {
+            let mut line_buf = VecDeque::new();
+            let mut is_ml = false;
+            contents.lines().for_each(|line| {
+                if is_ml {
+                    if line == "%>" {
+                        is_ml = false;
+                    } else {
+                        for tok in Lexer::lex_str(line) {
+                            line_buf.push_back(tok);
+                        }
+                    }
+                } else if line == "<%" {
+                    is_ml = true;
+                } else {
+                    line_buf.push_back(Token::Ident(String::from("print_ln")));
+                    line_buf.push_back(Token::Lparen);
+                    line_buf.push_back(Token::String(String::from(line)));
+                    line_buf.push_back(Token::Rparen);
+                }
+            });
+            let prog = Parser::new(&mut ScriptLexer(line_buf)).parse_program();
+            println!("{:?}", prog.statements());
+            Some(String::from("coo"))
+        },
+        _ => Some(contents),
+    }
 }

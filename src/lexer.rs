@@ -35,6 +35,11 @@ pub enum Token {
     String(String),
 }
 
+pub trait TokenLexer {
+    fn init(&mut self) {}
+    fn next_token(&mut self) -> Token;
+}
+
 pub struct Lexer {
     input: Vec<char>,
     pos: usize,
@@ -43,37 +48,12 @@ pub struct Lexer {
     keywords: HashMap<&'static str, Token>,
 }
 
-impl Lexer {
-    pub fn new(input: String) -> Lexer {
-        let mut keywords = HashMap::new();
-        keywords.insert("let", Token::Let);
-        keywords.insert("fn", Token::Function);
-        keywords.insert("true", Token::True);
-        keywords.insert("false", Token::False);
-        keywords.insert("if", Token::If);
-        keywords.insert("else", Token::Else);
-        keywords.insert("return", Token::Ret);
-        Lexer{ input: input.chars().collect::<Vec<char>>(), pos: 0, read_pos: 0, ch: None, keywords }
+impl TokenLexer for Lexer {
+    fn init(&mut self) {
+        self.read_char();
     }
 
-    pub fn read_char(&mut self) {
-        let nch = self.input.get(self.read_pos).map(|c| *c);
-        self.ch = nch.map(|c| {
-            self.pos = self.read_pos;
-            self.read_pos += 1;
-            c
-        });
-    }
-
-    pub fn get_char(&self) -> Option<char> {
-        self.ch
-    }
-
-    pub fn peek_char(&self) -> Option<char> {
-        self.input.get(self.read_pos).map(|c| *c)
-    }
-
-    pub fn next_token(&mut self) -> Token {
+    fn next_token(&mut self) -> Token {
         while self.ch.map_or(false, |c| {
             c.is_whitespace()
         }) {
@@ -136,6 +116,43 @@ impl Lexer {
         }
         ret
     }
+}
+
+impl Lexer {
+    pub fn new(input: String) -> Lexer {
+        let mut keywords = HashMap::new();
+        keywords.insert("let", Token::Let);
+        keywords.insert("fn", Token::Function);
+        keywords.insert("true", Token::True);
+        keywords.insert("false", Token::False);
+        keywords.insert("if", Token::If);
+        keywords.insert("else", Token::Else);
+        keywords.insert("return", Token::Ret);
+        Lexer{ input: input.chars().collect::<Vec<char>>(), pos: 0, read_pos: 0, ch: None, keywords }
+    }
+
+    pub fn lex_str(input: &str) -> Vec<Token> {
+        let mut lex = Lexer::new(String::from(input));
+        lex.read_char();
+        lex.collect::<Vec<Token>>()
+    }
+
+    pub fn read_char(&mut self) {
+        let nch = self.input.get(self.read_pos).map(|c| *c);
+        self.ch = nch.map(|c| {
+            self.pos = self.read_pos;
+            self.read_pos += 1;
+            c
+        });
+    }
+
+    pub fn get_char(&self) -> Option<char> {
+        self.ch
+    }
+
+    pub fn peek_char(&self) -> Option<char> {
+        self.input.get(self.read_pos).map(|c| *c)
+    }
 
     fn read_str(&mut self) -> String {
         let mut str = String::new();
@@ -189,7 +206,7 @@ impl Iterator for Lexer {
 
 #[cfg(test)]
 mod test {
-    use super::{ Lexer, Token };
+    use super::{ Lexer, Token, TokenLexer };
 
     #[test]
     fn test_read() {
@@ -234,9 +251,7 @@ mod test {
                            }
                            10 == 10;
                            10 != 9;";
-        let mut lex = Lexer::new(String::from(input));
-        lex.read_char();
-        let tokens = lex.collect::<Vec<Token>>();
+        let tokens = Lexer::lex_str(input);
         assert_eq!(tokens.len(), 73);
         assert!(!tokens.iter().any(|t| *t == Token::Illegal));
     }

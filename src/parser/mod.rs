@@ -1,6 +1,6 @@
 mod exprs;
 
-use lexer::{ Lexer, Token };
+use lexer::{ Lexer, Token, TokenLexer };
 use ast::*;
 use std::mem;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ enum OpPrecedence {
 }
 
 pub struct Parser<'a> {
-    lexer: &'a mut Lexer,
+    lexer: &'a mut TokenLexer,
     cur_tok: Token,
     next_tok: Token,
 }
@@ -41,8 +41,8 @@ lazy_static! {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(lexer: &mut Lexer) -> Parser {
-        lexer.read_char();
+    pub fn new(lexer: &mut TokenLexer) -> Parser {
+        lexer.init();
         let cur_tok = lexer.next_token();
         let next_tok = lexer.next_token();
         Parser{ lexer, cur_tok, next_tok }
