@@ -10,10 +10,14 @@ use parser::Parser;
 use eval::{ State, Eval, Value };
 use std::collections::HashMap;
 
+mod thread_pool;
+
 pub fn serve(interface: String, port: u16) {
     let listener = TcpListener::bind(format!("{}:{}", interface, port)).unwrap();
 
     println!("Serving to {} at port {}", interface, port);
+
+    let pool = thread_pool::ThreadPool::new(8);
     for stream in listener.incoming() {
         let stream = match stream {
             Ok(s) => {s},
@@ -21,7 +25,7 @@ pub fn serve(interface: String, port: u16) {
         };
         println!("New connection from {}", stream.peer_addr().unwrap());
 
-        handle_connection(stream);
+        pool.execute(move|| handle_connection(stream));
     }
 }
 

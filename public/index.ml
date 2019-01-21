@@ -12,5 +12,8 @@
     <p>
         <a href="/fib.ml">Fibonacci</a>
     </p>
+    <p>
+        <a href="/slow.ml">Slow</a>
+    </p>
   </body>
 </html>
